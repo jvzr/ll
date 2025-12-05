@@ -1,9 +1,24 @@
+//   .-.   .-.
+//   | |   | |
+//   | `--.| `--.
+//   `----'`----'
+//
+// ll – a small utility to list files in the current directory.
+//
+// # Why?
+// Because I wanted to display files in columns with git status.
+//
+// # Rationalize
+// One entry per line for lots of files can't be fitted on a screen
+// and requires scrolling. With the multi-column layout, space can be
+// used more efficiently. At the same time, git status information is
+// also often needed.
+
 package main
 
 import (
 	"bytes"
 	"fmt"
-	"golang.org/x/crypto/ssh/terminal"
 	"io/ioutil"
 	"math"
 	"os"
@@ -12,12 +27,14 @@ import (
 	. "strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 const (
-	modified  = "\033[1;34m%s\033[0m"
+	modified  = "\033[0;34m%s\033[0m"
 	added     = "\033[0;32m%s\033[0m"
-	untracked = "\033[0;36m%s\033[0m"
+	untracked = "\033[0;31m%s\033[0m"
 	bold      = "\033[1m%v\033[0m"
 )
 
@@ -69,10 +86,12 @@ func ll(cwd string) {
 	}
 
 	// We need terminal size to nicely fit on screen.
-	fd := int(os.Stdin.Fd())
-	width, height, err := terminal.GetSize(fd)
-	if err != nil {
+	var width, height int
+	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+	if err != nil || ws == nil {
 		width, height = 80, 60
+	} else {
+		width, height = int(ws.Col), int(ws.Row)
 	}
 
 	// If it's possible to fit all files in one column on half of screen, just use one column.
